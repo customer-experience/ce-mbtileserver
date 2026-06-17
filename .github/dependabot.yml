@@ -1,0 +1,34 @@
+version: 2
+
+registries:
+  npm-github:
+    type: npm-registry
+    url: https://npm.pkg.github.com
+    token: ${{secrets.ARQUITECTURA_DEPLOY}}
+  nuget-github:
+    type: nuget-feed
+    url: https://nuget.pkg.github.com/architecture-it/index.json
+    token: ${{secrets.ARQUITECTURA_DEPLOY}}
+  npm-fontawesome:
+    type: npm-registry
+    url: https://npm.fontawesome.com
+    token: ${{secrets.NPM_FONTAWESOME_KEY}}
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-name: "@architecture-it*"
+    registries:
+      - npm-github
+      - npm-fontawesome
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5    
+    registries:
+    - nuget-github

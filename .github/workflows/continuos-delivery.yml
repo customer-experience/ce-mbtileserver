@@ -1,0 +1,145 @@
+name: Continuous Delivery
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+      - hotfix
+    paths:
+      - 'src/**'
+      - 'deps/**'
+      - Dockerfile
+      - package.json
+jobs:
+  continuos_integration:
+   name: 🔎 Continuos Integration
+   runs-on: ${{ vars.CLOUD_RUNNER }}
+   steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Tag Setting
+      uses: infrastructure-services/continuos-integration@set-sonar-tags
+      with:
+        github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+        sonar_url: ${{ secrets.SONAR_HOST_URL }}
+        sonar_token: ${{ secrets.SONAR_TOKEN }}
+
+    - name: SonarQube Analyzer
+      uses: infrastructure-services/continuos-integration@v2
+      with:
+        github_username: ${{ secrets.ARQUITECTURA_USER }}
+        github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+        sonar_url: ${{ secrets.SONAR_HOST_URL }}
+        sonar_token: ${{ secrets.SONAR_TOKEN }}
+        workflow: ${{ vars.WORKFLOW_CI }} 
+        fontawesome_token: ${{ secrets.NPM_FONTAWESOME_KEY }}
+
+  build:
+    name: 🛠 🧱 Build and Push
+    runs-on: ${{ vars.CLOUD_RUNNER }}
+    outputs:
+      appVersion: ${{ steps.version.outputs.version }}
+    steps:
+    
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Get Version"
+        id: next-version
+        uses: infrastructure-services/continuos-integration@version
+        with:
+          github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+
+      - name: "Version pipeline"
+        id: version
+        shell: bash
+        run: |
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+                echo "version=${{ steps.next-version.outputs.version }}-${{ github.run_number }}" >> $GITHUB_OUTPUT
+                echo "::notice::Version: ${{ steps.next-version.outputs.version }}-${{ github.run_number }}"
+            else
+                echo "version=${{ steps.next-version.outputs.version }}.${{ github.run_number }}" >> $GITHUB_OUTPUT
+                echo "::notice::Version: ${{ steps.next-version.outputs.version }}.${{ github.run_number }}"
+            fi
+
+      - name: build imagen
+        id: build
+        uses: infrastructure-services/actions@build-and-push
+        with:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          appVersion: ${{ steps.version.outputs.version }}
+
+  despliegue:
+    name: 🚀 Activar Despliegue
+    runs-on: ubuntu-latest
+    needs: [build, continuos_integration]
+    steps:
+      - name: Execute Workflow Deploy
+        if: github.ref == 'refs/heads/main'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          script: | 
+            const appVersion = "${{ needs.build.outputs.appVersion }}";
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'continuos-deployment.yml',
+              ref: context.ref,
+              inputs: {
+                appVersion: appVersion,
+                test: true,
+                qa: true,
+                prod: true,
+              }
+            });
+      - name: Execute Test Deploy
+        if: github.ref == 'refs/heads/develop'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          script: | 
+            const appVersion = "${{ needs.build.outputs.appVersion }}";
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'continuos-deployment.yml',
+              ref: context.ref,
+              inputs: {
+                appVersion: appVersion,
+                test: true,
+                qa: false,
+                prod: false,
+              }
+            });
+
+      - name: Execute HotFix Deploy
+        if: github.ref == 'refs/heads/hotfix'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          script: | 
+            const appVersion = "${{ needs.build.outputs.appVersion }}";
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'continuos-deployment.yml',
+              ref: context.ref,
+              inputs: {
+                appVersion: appVersion,
+                test: false,
+                qa: false,
+                prod: true,
+              }
+            });
