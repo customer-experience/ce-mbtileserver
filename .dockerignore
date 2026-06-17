@@ -1,4 +1,2 @@
-**/.git
-**/node_modules
-testdata/*
-testdata-bad/*
+**
+!src/data/argentina.mbtiles

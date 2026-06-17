@@ -18,7 +18,7 @@ replicacontroller:
   # Cantidad de revisiones: de 1 a 3
   revisionHistoryLimit: 1
   # Cantidad de instancias (Pods): de 1 a 10
-  replicas: 0
+  replicas: 1
 #############################################################################
 ##
 ##  Grupo de aplicacion donde va a estar contenido ##########################
@@ -47,17 +47,17 @@ timeout: "180s"
 ##  Pruebas de lectura y vida ###############################################
 healthcheck:
   # Ejecutar prueba de lectura: true o false
-  readiness: false
+  readiness: true
   # Path: "[path]"
-  readinesspath: "/index.html"
+  readinesspath: "/health"
   # Port: "[Port]"
   readinessport: "8080"
   # Type: HTTP
   readinessscheme: HTTP
   # Ejecutar prueba de vida: true o false
-  liveness: false
+  liveness: true
   # Path: "[path]"
-  livenesspath: "/index.html"
+  livenesspath: "/health"
   # Port: "[Port]"
   livenessport: "8080"
   # Type: HTTP
