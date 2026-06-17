@@ -1,4 +1,0 @@
-name: "build_x86_64"
-runs:
-    using: "docker"
-    image: "Dockerfile"

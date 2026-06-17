@@ -1,0 +1,102 @@
+#############################################################################
+#######################  Parametros para despliegue  ########################
+#############################################################################
+## NOMBRE DE APLICACION: [nombre-de-app]
+#############################################################################
+##
+## Variables y Secrets ######################################################
+env:
+  # Definición de Variables
+  normal:
+    # [key]:"[value]"
+  # Definición de Secrets
+  secret:
+#############################################################################
+##
+## Revisiones y escalamiento horizontal #####################################
+replicacontroller:
+  # Cantidad de revisiones: de 1 a 3
+  revisionHistoryLimit: 1
+  # Cantidad de instancias (Pods): de 1 a 10
+  replicas: 0
+#############################################################################
+##
+##  Grupo de aplicacion donde va a estar contenido ##########################
+applicationGroup:
+  # Si esta o no contenido: true o false
+  group: false
+  # Nombre
+  partOf: "NombreAplicationGroup"
+#############################################################################
+##
+## Red ######################################################################
+service:
+  # Puerto del servicio: [port]
+  Port: 8080
+  # Puerto del contenedor: [port]
+  targetPort: 8080
+##
+# Formato estandar de ruta: 
+# [nombre-de-app]-[nombre-de-proyecto]-[ambiente].clusterFQDN
+# Exponer en una ruta privada: true o false
+route: true
+#Timeout de respuesta de la api
+timeout: "180s"
+#############################################################################
+##
+##  Pruebas de lectura y vida ###############################################
+healthcheck:
+  # Ejecutar prueba de lectura: true o false
+  readiness: false
+  # Path: "[path]"
+  readinesspath: "/index.html"
+  # Port: "[Port]"
+  readinessport: "8080"
+  # Type: HTTP
+  readinessscheme: HTTP
+  # Ejecutar prueba de vida: true o false
+  liveness: false
+  # Path: "[path]"
+  livenesspath: "/index.html"
+  # Port: "[Port]"
+  livenessport: "8080"
+  # Type: HTTP
+  livenessscheme: HTTP
+#############################################################################
+##
+##  Cronjobs ################################################################
+cronjob:
+  enable: false
+  crons:
+    "0":
+     name: diario
+     schedule: "10 10 * * *"
+     successfulJobsHistoryLimit: 3
+     failedJobsHistoryLimit: 1
+    "1":
+     name: semanal
+     schedule: "10 10 * * 5"
+     successfulJobsHistoryLimit: 3
+     failedJobsHistoryLimit: 1
+    "2":
+     name: mensual
+     schedule: "10 10 5 * *"
+     successfulJobsHistoryLimit: 3
+     failedJobsHistoryLimit: 1
+    "3":
+     name: anual
+     schedule: "10 10 * 12 5"
+     successfulJobsHistoryLimit: 3
+     failedJobsHistoryLimit: 1
+############################################################################# 
+##
+##  Configmap ###############################################################
+configMap:
+  enable: false
+  path: /etc/ssl/custom
+#############################################################################
+##
+##  Redireccion de Logs #####################################################
+clusterlogging: true
+#############################################################################
+############################################################################

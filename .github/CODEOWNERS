@@ -1,0 +1,10 @@
+.github @customer-experience/devops
+.devops @customer-experience/devops @customer-experience/constancias-admin @customer-experience/constancias-reviewers @customer-experience/constancias-developers
+
+src @customer-experience/constancias-admin @customer-experience/constancias-reviewers
+grains @customer-experience/constancias-admin @customer-experience/constancias-reviewers
+package.json @customer-experience/constancias-admin @customer-experience/constancias-reviewers
+public @customer-experience/constancias-admin @customer-experience/constancias-reviewers
+
+
+Dockerfile @customer-experience/devops

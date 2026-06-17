@@ -1,0 +1,76 @@
+name: Restart Service
+on:
+  workflow_dispatch:
+    inputs:
+      motivo:
+        description: 'Motivo del Restart'
+        required: false
+      test:
+        description: 'Test'
+        required: true
+        type: boolean
+        default: false
+      qa:
+        description: 'QA'
+        required: true
+        type: boolean
+        default: false
+      prod:
+        description: 'Production'
+        required: true
+        type: boolean
+        default: false
+jobs:
+  Service_Restart_Test:
+   name: 🦖 Restart Service Test
+   environment: Test
+   runs-on:
+     group: Test
+   if: ${{ inputs.test }} 
+   steps:
+    - name: Restarting Service
+      uses: infrastructure-services/actions@restart-s
+      with:
+        appName: ${{ vars.APPNAME }}
+        restartMotive: ${{ inputs.motivo }}
+        ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+        ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_TEST }}
+        ARGO_URL: ${{secrets.ARGO_URL_TEST}}
+        projectName: ${{ vars.PROJECT }}
+        environmentName: ${{ vars.ENVIRONMENT_NAME }}
+
+  Service_Restart_QA:
+   name: 🦖 Restart Service QA
+   environment: QA
+   runs-on:
+     group: QA
+   if: ${{ inputs.qa }} 
+   steps:
+    - name: Restarting Service
+      uses: infrastructure-services/actions@restart-s
+      with:
+        appName: ${{ vars.APPNAME }}
+        restartMotive: ${{ inputs.motivo }}
+        ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+        ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_QA }}
+        ARGO_URL: ${{secrets.ARGO_URL_QA}}
+        projectName: ${{ vars.PROJECT }}
+        environmentName: ${{ vars.ENVIRONMENT_NAME }}
+
+  Service_Restart_Prod:
+   name: 🦖 Restart Service PROD
+   environment: QA
+   runs-on:
+     group: Production
+   if: ${{ inputs.prod }} 
+   steps:
+    - name: Restarting Service
+      uses: infrastructure-services/actions@restart-s
+      with:
+        appName: ${{ vars.APPNAME }}
+        restartMotive: ${{ inputs.motivo }}
+        ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+        ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_AKSPRODBR }}
+        ARGO_URL: ${{secrets.ARGO_URL_AKSPRODBR}}
+        projectName: ${{ vars.PROJECT }}
+        environmentName: "prod"

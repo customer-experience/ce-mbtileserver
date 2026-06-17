@@ -1,0 +1,316 @@
+name: Continuous Deployment
+on:
+  workflow_dispatch:
+    inputs:
+      appVersion:
+        description: 'version de aplicación'
+        required: true
+      test:
+        description: 'Test'
+        required: true
+        type: boolean
+        default: false
+      qa:
+        description: 'QA'
+        required: true
+        type: boolean
+        default: false
+      prod:
+        description: 'Production'
+        required: true
+        type: boolean
+        default: false
+jobs:
+  Preparativos:
+    name: 📕 Preparativos
+    outputs:
+      helmVersion: ${{ steps.helmVersion.outputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preparativos
+      - run: echo Github refs ${{ github.ref }}
+      - run: echo Version App ${{ inputs.appVersion }}
+      - run: echo Helm Version ${{ inputs.helmVersion }}
+      - name: Show Environment to deploy
+        run: |
+          echo "test=${{ inputs.test }}"
+          echo "qa=${{ inputs.qa }}"
+          echo "prod=${{ inputs.prod }}"
+      - id: helmVersion
+        run: |
+          defaultVersion="${{ inputs.appVersion }}"
+          echo "version=$defaultVersion" >> $GITHUB_OUTPUT
+      - name: Validate variables
+        run: |
+          if [[ -z "${{ vars.APPNAME }}" ]]; then
+            echo "APPNAME is empty"
+            exit 1
+          fi
+          if [[ -z "${{ vars.PROJECT }}" ]]; then
+            echo "PROJECT is empty"
+            exit 1
+          fi
+      - name: "Validate Version"
+        uses: infrastructure-services/continuos-deployment@image-tag-check
+        with:
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
+          REGISTRY_USER: ${{ secrets.ACR_NAME }}
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          appVersion: ${{ inputs.appVersion }}        
+      - run: echo "✅ Success" 
+
+  Deploy_to_test:
+    name: 🚀 Deploy Test
+    environment: 
+      name: Test
+      url: ${{ steps.deploy.outputs.url_environment }}
+    needs: Preparativos
+    runs-on:
+      group: Test
+    if: ${{ ! cancelled() && ! failure() && inputs.test }} 
+    outputs:
+      name_environment: ${{ steps.deploy.outputs.name_environment }}
+    steps:
+      - run: echo Deploy Test
+      - name: Deploy
+        id: deploy
+        uses: infrastructure-services/continuos-deployment@helm-and-deploy
+        with:
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          namespace: ${{ vars.PROJECT }}-${{ vars.ENVIRONMENT_NAME }}
+          appVersion: ${{ inputs.appVersion }}
+          clusterFqdn: ${{ vars.CLUSTERFQDN_TEST }}
+          fileValuesPath: .devops/value-${{ vars.ENVIRONMENT_NAME }}.yaml
+          GITHUB_HELMREPO_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          helmChartVersionLatest: ${{ needs.Preparativos.outputs.helmVersion }}.${{ vars.ENVIRONMENT_NAME }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+          ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_TEST }}
+          ARGO_URL: ${{secrets.ARGO_URL_TEST}}
+          environment: ${{ vars.ENVIRONMENT_NAME }}
+          helmRepoRef: ${{ vars.FLAVOR }}
+          APM_SERVER_URL: ${{vars.APM_SERVER_URL_TEST}}
+          AZURE_KEYVAULT_NAME: ${{ secrets.KV_NAME_TEST }}
+          AZURE_KEYVAULT_TENANT: ${{ secrets.KV_TENANT_TEST }}
+          AZURE_KEYVAULT_CLIENT_ID: ${{ secrets.KV_CLIENT_ID_TEST }}
+          AZURE_KEYVAULT_SECRET: ${{ secrets.KV_SECRET_TEST }}
+          AZURE_KEYVAULT_PREFIX: ${{ vars.APP_ID }}-TEST
+      - run: echo "✅ Success" 
+
+  Prerelease_test:
+    name: 📌 Pre Release Test
+    needs: [Preparativos, Deploy_to_test]
+    runs-on: ubuntu-latest
+    if: ${{ ! cancelled() && ! failure() && inputs.test }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          tag: ${{ inputs.appVersion }}-${{ needs.Deploy_to_test.outputs.name_environment }}.${{ github.run_number }}
+          skipIfReleaseExists: true
+          name: ${{ needs.Deploy_to_test.outputs.name_environment }} ${{ inputs.appVersion }}-${{ needs.Deploy_to_test.outputs.name_environment }}.${{ github.run_number }}
+          draft: false
+          prerelease: true
+      - run: echo "✅ Success" 
+
+  Deploy_to_qa:
+    name: 🚀 Deploy QA
+    environment: 
+      name: QA
+      url: ${{ steps.deploy.outputs.url_environment }}
+    needs: [ Preparativos, Deploy_to_test ]  
+    runs-on:
+      group: QA
+    if: ${{ ! cancelled() && ! failure() && inputs.qa }} 
+    outputs:
+      name_environment: ${{ steps.deploy.outputs.name_environment }}
+    steps:
+      - run: echo Deploy QA
+      - name: Deploy
+        id: deploy
+        uses: infrastructure-services/continuos-deployment@helm-and-deploy
+        with:
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          namespace: ${{ vars.PROJECT }}-${{ vars.ENVIRONMENT_NAME }}
+          appVersion: ${{ inputs.appVersion }}
+          clusterFqdn: ${{ vars.CLUSTERFQDN_QA }}
+          fileValuesPath: .devops/value-${{ vars.ENVIRONMENT_NAME }}.yaml
+          GITHUB_HELMREPO_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          helmChartVersionLatest: ${{ needs.Preparativos.outputs.helmVersion }}.${{ vars.ENVIRONMENT_NAME }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+          ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_QA }}
+          ARGO_URL: ${{secrets.ARGO_URL_QA}}
+          environment: ${{ vars.ENVIRONMENT_NAME }}
+          helmRepoRef: ${{ vars.FLAVOR }}
+          cpuLimit: ${{ vars.CPU_LIMIT }}
+          memLimit: ${{ vars.MEM_LIMIT}}
+          APM_SERVER_URL: ${{vars.APM_SERVER_URL_TEST}}
+          AZURE_KEYVAULT_NAME: ${{ secrets.KV_NAME_QA }}
+          AZURE_KEYVAULT_TENANT: ${{ secrets.KV_TENANT_QA }}
+          AZURE_KEYVAULT_CLIENT_ID: ${{ secrets.KV_CLIENT_ID_QA }}
+          AZURE_KEYVAULT_SECRET: ${{ secrets.KV_SECRET_QA }}
+          AZURE_KEYVAULT_PREFIX: ${{ vars.APP_ID }}-QA
+      - run: echo "✅ Success" 
+
+  Prerelease_qa:
+    name: 📌 Pre Release QA
+    needs: [Preparativos, Deploy_to_qa]
+    runs-on: ubuntu-latest
+    if: ${{ ! cancelled() && ! failure() && inputs.qa }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          tag: ${{ inputs.appVersion }}-${{ needs.Deploy_to_qa.outputs.name_environment }}.${{ github.run_number }}
+          skipIfReleaseExists: true
+          name: ${{ needs.Deploy_to_qa.outputs.name_environment }} ${{ inputs.appVersion }}-${{ needs.Deploy_to_qa.outputs.name_environment }}.${{ github.run_number }}
+          draft: false
+          prerelease: true
+      - run: echo "✅ Success" 
+  
+  Predeploy_to_production:
+    name: 👀 Pre Deploy Prod 
+    needs: [Preparativos, Deploy_to_qa] 
+    runs-on: ubuntu-latest
+    if: ${{ ! cancelled() && ! failure() && inputs.prod }}
+    steps:
+      - run: echo Validaciones Pre Deploy Prod
+      - name: Validate Quality Gates
+        uses: infrastructure-services/continuos-deployment@validate-pre-prod
+        with:
+          sonar_url: ${{ secrets.SONAR_HOST_URL }}
+          sonar_token: ${{ secrets.SONAR_TOKEN }}
+      - run: echo "✅ Success" 
+
+  Deploy_to_production:
+    name: 🚀 Deploy Prod
+    environment: 
+      name: Production
+      url: ${{ steps.deploy.outputs.url_environment }}
+    needs: [ Preparativos, Predeploy_to_production ]
+    runs-on:
+      group: Production
+    if: ${{ ! cancelled() && ! failure() && inputs.prod }}
+    outputs:
+      name_environment: ${{ steps.deploy.outputs.name_environment }}
+    steps:
+      - run: echo Deploy Prod
+      - name: Deploy
+        id: deploy
+        uses: infrastructure-services/continuos-deployment@helm-and-deploy
+        with:
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          namespace: ${{ vars.PROJECT }}-${{ vars.ENVIRONMENT_NAME }}
+          appVersion: ${{ inputs.appVersion }}
+          clusterFqdn: ${{ vars.CLUSTERFQDN_ARO }}
+          fileValuesPath: .devops/value-${{ vars.ENVIRONMENT_NAME }}.yaml
+          GITHUB_HELMREPO_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          helmChartVersionLatest: ${{ needs.Preparativos.outputs.helmVersion }}.${{ vars.ENVIRONMENT_NAME }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          ARGO_USERNAME: ${{ secrets.ARGO_USERNAME }}
+          ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_AKSPRODBR }}
+          ARGO_URL: ${{secrets.ARGO_URL_AKSPRODBR }}
+          environment: ${{ vars.ENVIRONMENT_NAME }}
+          APPS_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_CERTIFICATE_ARO}} 
+          APPS_CA_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_CA_ARO}}
+          APPS_KEY_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_KEY_ARO}}
+          helmRepoRef: ${{ vars.FLAVOR }}
+          cpuLimit: ${{ vars.CPU_LIMIT }}
+          memLimit: ${{ vars.MEM_LIMIT}}
+          cpuRequest: ${{ vars.CPU_REQUEST}}
+          memRequest: ${{ vars.MEM_REQUEST}}
+          APM_SERVER_URL: ${{vars.APM_SERVER_URL_PROD}}
+          AZURE_KEYVAULT_NAME: ${{ secrets.KV_NAME_PROD }}
+          AZURE_KEYVAULT_TENANT: ${{ secrets.KV_TENANT_PROD }}
+          AZURE_KEYVAULT_CLIENT_ID: ${{ secrets.KV_CLIENT_ID_PROD }}
+          AZURE_KEYVAULT_SECRET: ${{ secrets.KV_SECRET_PROD }}
+          AZURE_KEYVAULT_PREFIX: ${{ vars.APP_ID }}-PROD
+      - run: echo "✅ Success" 
+
+  Production_code_backup:
+    name: 💾 Production Code Backup
+    needs: [ Preparativos, Deploy_to_production ]
+    runs-on:
+      group: Production
+    if: ${{ ! cancelled() && ! failure() && inputs.prod }}
+    steps:
+      - run: echo Realizando copia de seguridad de código
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: "Backup Code"
+        shell: bash
+        run: |
+          echo "Backup del repo con el código productivo"
+          sudo mkdir -p /backup/${{ vars.PROJECT }}/${{ vars.APPNAME }}
+          ls -la
+
+          #Backupear las variables del repo.
+          echo "${{ toJSON(vars) }}" > RepoVars.json
+         
+          #Mover a la ruta de backup el repo
+          sudo cp -r -f . /backup/${{ vars.PROJECT }}/${{ vars.APPNAME }}/
+          echo "Archivos copiados"
+          cd /backup/${{ vars.PROJECT }}/${{ vars.APPNAME }}
+          ls -la
+          cat ./RepoVars.json
+      - run: echo "✅ Success"
+
+  Release:
+    name: ✨ Release 
+    needs: [ Preparativos, Deploy_to_production  ]
+    runs-on: ubuntu-latest
+    if: ${{ ! cancelled() && ! failure() && inputs.prod && github.actor == 'CybersecurityGLA' }}
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Contribute List
+        uses: akhilmhdh/contributors-readme-action@v2.3.10
+        env:
+            GITHUB_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
+
+      - name: Release
+        uses: infrastructure-services/continuos-deployment@release
+        with:
+          github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+          appName: ${{ vars.APPNAME }}
+          teamProject: ${{ vars.PROJECT }}
+          appVersion: ${{ inputs.appVersion }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_FULL_NAME: ${{ secrets.ACR_FULL_NAME }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+          jira_email: ${{ secrets.JIRA_EMAIL }}
+          jira_project_id: ${{ vars.JIRA_BOARD_ID }}
+          jira_api_token: ${{ secrets.JIRA_API_TOKEN }}
+          webhook_url_teams: ${{ secrets.URL_NOTIFICACIONES_TEAMS }}

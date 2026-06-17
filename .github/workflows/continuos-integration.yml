@@ -1,0 +1,42 @@
+name: Continuous Integration
+
+on: 
+    pull_request:
+      paths:
+        - 'src/**'
+        - 'deps/**'
+        - Dockerfile
+        - package.json
+
+# Workflow can only run once per branch and any previous pending or in-progress runs are cancelled.
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  continuos_integration:
+   name: 🔎 Continuos Integration
+   runs-on: ${{ vars.CLOUD_RUNNER }}
+   steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: SonarQube Analyzer
+      uses: infrastructure-services/continuos-integration@v2
+      with:
+        github_username: ${{ secrets.ARQUITECTURA_USER }}
+        github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+        sonar_url: ${{ secrets.SONAR_HOST_URL }}
+        sonar_token: ${{ secrets.SONAR_TOKEN }}
+        workflow: ${{ vars.WORKFLOW_CI }}
+        fontawesome_token: ${{ secrets.NPM_FONTAWESOME_KEY }}
+        
+    - name: Validations Post Analysis
+      uses: infrastructure-services/continuos-integration@validations
+      with:
+        github_username: ${{ secrets.ARQUITECTURA_USER }}
+        github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
+        jira_email: ${{ secrets.JIRA_EMAIL }}
+        jira_api_token: ${{ secrets.JIRA_API_TOKEN }}
