@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ ! cancelled() && ! failure() && inputs.test }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Create Release
@@ -174,7 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ ! cancelled() && ! failure() && inputs.qa }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Create Release
@@ -197,10 +197,11 @@ jobs:
     steps:
       - run: echo Validaciones Pre Deploy Prod
       - name: Validate Quality Gates
-        uses: infrastructure-services/continuos-deployment@validate-pre-prod
+        uses: infrastructure-services/continuos-deployment@code-quality-gate
         with:
-          sonar_url: ${{ secrets.SONAR_HOST_URL }}
-          sonar_token: ${{ secrets.SONAR_TOKEN }}
+          nolocking: "true"
+          type: "v3"
+          qualitygatedata: ""
       - run: echo "✅ Success" 
 
   Deploy_to_production:
@@ -236,9 +237,6 @@ jobs:
           ARGO_PASSWORD: ${{ secrets.ARGO_PASSWORD_AKSPRODBR }}
           ARGO_URL: ${{secrets.ARGO_URL_AKSPRODBR }}
           environment: ${{ vars.ENVIRONMENT_NAME }}
-          APPS_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_CERTIFICATE_ARO}} 
-          APPS_CA_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_CA_ARO}}
-          APPS_KEY_CERTIFICATE: ${{secrets.APPS_ANDREANI_COMAR_KEY_ARO}}
           helmRepoRef: ${{ vars.FLAVOR }}
           cpuLimit: ${{ vars.CPU_LIMIT }}
           memLimit: ${{ vars.MEM_LIMIT}}
@@ -261,7 +259,7 @@ jobs:
     steps:
       - run: echo Realizando copia de seguridad de código
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: "Backup Code"
@@ -288,17 +286,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ ! cancelled() && ! failure() && inputs.prod && github.actor == 'CybersecurityGLA' }}
     steps:
-
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Contribute List
-        uses: akhilmhdh/contributors-readme-action@v2.3.10
-        env:
-            GITHUB_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
-
       - name: Release
         uses: infrastructure-services/continuos-deployment@release
         with:
