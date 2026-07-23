@@ -17,24 +17,16 @@ jobs:
    runs-on: ${{ vars.CLOUD_RUNNER }}
    steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
-    - name: Tag Setting
-      uses: infrastructure-services/continuos-integration@set-sonar-tags
-      with:
-        github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
-        sonar_url: ${{ secrets.SONAR_HOST_URL }}
-        sonar_token: ${{ secrets.SONAR_TOKEN }}
 
-    - name: SonarQube Analyzer
-      uses: infrastructure-services/continuos-integration@v2
+    - name: Quality Gate Analyzer
+      uses: infrastructure-services/continuos-integration@v3
       with:
         github_username: ${{ secrets.ARQUITECTURA_USER }}
         github_token: ${{ secrets.ARQUITECTURA_DEPLOY }}
-        sonar_url: ${{ secrets.SONAR_HOST_URL }}
-        sonar_token: ${{ secrets.SONAR_TOKEN }}
         workflow: ${{ vars.WORKFLOW_CI }} 
         fontawesome_token: ${{ secrets.NPM_FONTAWESOME_KEY }}
 
@@ -46,7 +38,7 @@ jobs:
     steps:
     
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -87,7 +79,7 @@ jobs:
     steps:
       - name: Execute Workflow Deploy
         if: github.ref == 'refs/heads/main'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
           script: | 
@@ -106,7 +98,7 @@ jobs:
             });
       - name: Execute Test Deploy
         if: github.ref == 'refs/heads/develop'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
           script: | 
@@ -126,7 +118,7 @@ jobs:
 
       - name: Execute HotFix Deploy
         if: github.ref == 'refs/heads/hotfix'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.ARQUITECTURA_DEPLOY }}
           script: | 
