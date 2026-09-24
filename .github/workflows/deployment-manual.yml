@@ -1,0 +1,32 @@
+name: Deployment Manual
+on:
+  workflow_dispatch:
+    inputs:
+      appVersion:
+        description: 'version de aplicación'
+        required: true
+      test:
+        description: 'Test'
+        required: true
+        type: boolean
+        default: false
+      qa:
+        description: 'QA'
+        required: true
+        type: boolean
+        default: false
+      prod:
+        description: 'Production'
+        required: true
+        type: boolean
+        default: false
+jobs:
+  despliegue:
+      name: 🚀 Despliegue
+      uses: infrastructure-services/workflow/.github/workflows/deployment-manual.yml@main
+      with:
+        appVersion: ${{ inputs.appVersion }}
+        test: ${{ inputs.test }}
+        qa: ${{ inputs.qa }}
+        prod: ${{ inputs.prod }}
+      secrets: inherit

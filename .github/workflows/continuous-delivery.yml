@@ -1,0 +1,38 @@
+name: Continuous Delivery
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+      - hotfix
+    paths:
+      - 'src/**'
+      - 'deps/**'
+      - Dockerfile
+      - package.json
+      
+jobs:
+  continuous_delivery:
+    name: 🔎 Continuous Delivery
+    uses: infrastructure-services/workflow/.github/workflows/continuous-delivery.yml@main
+    secrets: inherit
+
+  security_analysis:
+    name: 🔎 Security
+    uses: infrastructure-services/workflow/.github/workflows/security-analysis.yml@main
+    secrets: inherit
+
+  despliegue:
+    name: 🚀 Despliegue
+    needs:
+      - continuous_delivery
+    if: ${{ !cancelled() && needs.continuous_delivery.result == 'success' }}
+    uses: infrastructure-services/workflow/.github/workflows/continuous-deployment.yml@main
+    with:
+      appVersion: ${{ needs.continuous_delivery.outputs.appVersion }}
+      test: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
+      qa: ${{ github.ref == 'refs/heads/main' }}
+      prod: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/hotfix' }}
+    secrets: inherit

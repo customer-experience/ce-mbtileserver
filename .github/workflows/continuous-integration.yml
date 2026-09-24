@@ -1,0 +1,23 @@
+name: Continuous Integration
+
+on: 
+    pull_request:
+      paths:
+        - 'src/**'
+        - 'deps/**'
+        - Dockerfile
+        - package.json
+
+# Workflow can only run once per branch and any previous pending or in-progress runs are cancelled.
+env:
+  GH_TOKEN: ${{ secrets.ARQUITECTURA_DEPLOY }}
+# Workflow can only run once per branch and any previous pending or in-progress runs are cancelled.
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  analisis:
+    name: 🔎 Continuous Integration
+    uses: infrastructure-services/workflow/.github/workflows/continuous-integration.yml@main
+    secrets: inherit
